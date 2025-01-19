@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/userNameTextView"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:textStyle="bold"
+        android:textSize="20sp"
+        android:padding="7dp"
+        android:textColor="@color/black"
+        android:text="Name" />
+
+</LinearLayout>
