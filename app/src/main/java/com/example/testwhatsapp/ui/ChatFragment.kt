@@ -1,5 +1,6 @@
 package com.example.testwhatsapp.ui
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -7,20 +8,22 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
-import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.testwhatsapp.R
 import com.example.testwhatsapp.adapter.MessageAdapter
 import com.example.testwhatsapp.databinding.FragmentChatBinding
 import com.example.testwhatsapp.model.Message
+import com.example.testwhatsapp.viewmodel.ChatViewModel
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import org.koin.android.ext.android.inject
 
 class ChatFragment : Fragment() {
 
@@ -30,6 +33,8 @@ class ChatFragment : Fragment() {
     private val messages = mutableListOf<Message>()
     private lateinit var database: DatabaseReference
     private var userId: String? = null
+    private lateinit var auth: FirebaseAuth
+    private val chatViewModel: ChatViewModel by inject()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -40,18 +45,34 @@ class ChatFragment : Fragment() {
         _binding = FragmentChatBinding.inflate(inflater, container, false)
         activity?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
                 WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        auth = FirebaseAuth.getInstance()
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId == null) {
+            findNavController().navigate(R.id.loginFragment)
+            return
+        }
         userId = arguments?.getString("userId")
-        setupRecyclerView()
-        setupSendButton()
-        fetchMessages(userId)
+        val chatId = createChatId(currentUserId.toString(), userId ?: "")
+        setupRecyclerView(currentUserId)
+        setupSendButton(chatId)
+        observeMessages(chatId)
+        getUserName(userId)
     }
 
-    private fun fetchMessages(userId: String?) {
+    private fun observeMessages(chatId: String) {
+        chatViewModel.fetchMessages(chatId).observe(viewLifecycleOwner, Observer { messageList -> messages.clear()
+        messages.addAll(messageList)
+            messageAdapter.notifyDataSetChanged()
+            binding.messageRecyclerView.scrollToPosition(messages.size - 1)
+        })
+    }
+
+    private fun getUserName(userId: String?) {
         if (userId != null) {
             database = FirebaseDatabase.getInstance().getReference("users").child(userId)
             database.addListenerForSingleValueEvent(object : ValueEventListener {
@@ -59,47 +80,46 @@ class ChatFragment : Fragment() {
                     val userName = snapshot.child("name").value as? String
                     if (userName != null) {
                         binding.userNameTextView.text = userName
+                    } else {
+                        binding.userNameTextView.text = "Unknown User"
                     }
                 }
+
                 override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(context, "userName null", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Username could not be retrieved: ${error.message}", Toast.LENGTH_SHORT).show()
                 }
             })
         }
     }
-    
-    private fun setupRecyclerView() {
-        messageAdapter = MessageAdapter(messages)
+
+    @SuppressLint("NotifyDataSetChanged")
+    private fun setupRecyclerView(currentUserId: String) {
+        messageAdapter = MessageAdapter(messages, currentUserId)
         binding.messageRecyclerView.layoutManager = LinearLayoutManager(context)
         binding.messageRecyclerView.adapter = messageAdapter
-        messages.addAll(getDummyMessages())
         messageAdapter.notifyDataSetChanged()
     }
 
-    private fun setupSendButton() {
+    private fun setupSendButton(chatId: String) {
         binding.sendButton.setOnClickListener {
-//            sendMessage(userId)
             val messageContent = binding.messageEditText.text.toString().trim()
             if (messageContent.isNotEmpty()) {
                 val newMessage = Message(
-                    id = messages.size.toString(),
-                    sender = "Me",
+                    id = "",
+                    sender = auth.currentUser?.uid ?: "Unknown",
                     content = messageContent,
                     timestamp = System.currentTimeMillis()
                 )
-                messages.add(newMessage)
-                messageAdapter.notifyItemInserted(messages.size - 1)
-                binding.messageRecyclerView.scrollToPosition(messages.size - 1)
+                userId?.let { receiverId ->
+                    chatViewModel.sendMessage(chatId, newMessage, receiverId)
+                }
                 binding.messageEditText.text.clear()
             }
         }
     }
 
-    private fun getDummyMessages(): List<Message> {
-        return listOf(
-            Message(id = "1", sender = "User A", content = "Hello!", timestamp = 14012025),
-            Message(id = "2", sender = "User B", content = "Hi there!", timestamp = 14012025)
-        )
+    private fun createChatId(userId1: String, userId2: String): String {
+        return if (userId1 < userId2) "$userId1-$userId2" else "$userId2-$userId1"
     }
 
     override fun onPrepareOptionsMenu(menu: Menu) {
@@ -108,23 +128,8 @@ class ChatFragment : Fragment() {
         menu.findItem(R.id.action_logout)?.isVisible = false
     }
 
-//    private fun setupInsetsListener() {
-//        binding.root.viewTreeObserver.addOnGlobalLayoutListener {
-//            val rect = android.graphics.Rect()
-//            binding.root.getWindowVisibleDisplayFrame(rect)
-//            val screenHeight = binding.root.rootView.height
-//            val keypadHeight = screenHeight - rect.bottom
-//            if (keypadHeight > screenHeight * 0.15) {
-//                binding.bottomContainer.translationY = -keypadHeight.toFloat()
-//            } else {
-//                binding.bottomContainer.translationY = 0f
-//            }
-//        }
-//    }
-
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
     }
 }
-

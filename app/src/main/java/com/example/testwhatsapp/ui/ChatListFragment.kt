@@ -7,17 +7,22 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.SearchView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Observer
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.testwhatsapp.R
 import com.example.testwhatsapp.adapter.ChatListAdapter
 import com.example.testwhatsapp.adapter.UserAdapter
 import com.example.testwhatsapp.databinding.FragmentChatListBinding
-import com.example.testwhatsapp.model.Message
 import com.example.testwhatsapp.model.User
+import com.example.testwhatsapp.viewmodel.ChatListViewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import org.koin.android.ext.android.inject
 
 class ChatListFragment : Fragment() {
 
@@ -25,9 +30,10 @@ class ChatListFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var chatListAdapter: ChatListAdapter
     private lateinit var userAdapter: UserAdapter
-    private lateinit var database: DatabaseReference
-    private lateinit var auth: FirebaseAuth
     private val users = mutableListOf<User>()
+    private lateinit var auth: FirebaseAuth
+
+    private val chatListViewModel: ChatListViewModel by inject()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -40,39 +46,36 @@ class ChatListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         auth = FirebaseAuth.getInstance()
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            findNavController().navigate(R.id.loginFragment)
+            return
+        }
         setupSearchView()
         setupRecyclerView()
-        fetchUsers()
+        observeUsers()
         setupActionBarTitle()
     }
 
-    private fun fetchUsers() {
-        database = FirebaseDatabase.getInstance().getReference("users")
-        database.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                users.clear()
-                for (data in snapshot.children) {
-                    val user = data.getValue(User::class.java)
-                    if (user != null) {
-                        users.add(user)
-                    }
-                }
+    private fun observeUsers() {
+        chatListViewModel.fetchUsers().observe(viewLifecycleOwner, Observer { userList ->
+            users.clear()
+            if (userList != null && userList.isNotEmpty()) {
+                users.addAll(userList.sortedByDescending { it.lastMessageTimestamp })
                 userAdapter.updateList(users)
-                Log.d("FetchUsers", "Total users: ${users.size}")
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                binding.noResultsTextView.text = "Error: ${error.message}"
-                binding.noResultsTextView.visibility = View.VISIBLE
-                binding.usersRecyclerView.visibility = View.GONE
-                binding.chatRecyclerView.visibility = View.GONE
-                Log.e("FetchUsers", "Error: ${error.message}")
+                chatListAdapter.updateList(users)
+                userAdapter.notifyDataSetChanged()
+                chatListAdapter.notifyDataSetChanged()
+                Log.d("ChatListFragment", "observeUsers")
+            } else {
+                Log.d("ChatListFragment", "No users found")
             }
         })
     }
 
+
     private fun setupRecyclerView() {
-        val messages = getDummyMessages()
+        // UserAdapter
         userAdapter = UserAdapter { user ->
             Log.d("ChatListFragment", "chatList to chat with userId: ${user.name}")
             val action = ChatListFragmentDirections.actionChatListFragmentToChatFragment(user.id)
@@ -81,30 +84,17 @@ class ChatListFragment : Fragment() {
         binding.usersRecyclerView.adapter = userAdapter
         binding.usersRecyclerView.layoutManager = LinearLayoutManager(context)
 
-        chatListAdapter = ChatListAdapter(messages)
+        // ChatListAdapter
+        chatListAdapter = ChatListAdapter(users)
         binding.chatRecyclerView.adapter = chatListAdapter
         binding.chatRecyclerView.layoutManager = LinearLayoutManager(context)
-
-        chatListAdapter.setOnItemClickListener { message ->
-            val action = ChatListFragmentDirections.actionChatListFragmentToChatFragment(message.id)
+        binding.chatRecyclerView.visibility = View.VISIBLE
+        chatListAdapter.setOnItemClickListener { user ->
+            val action = ChatListFragmentDirections.actionChatListFragmentToChatFragment(user.id)
             findNavController().navigate(action)
         }
-        chatListAdapter.updateList(messages)
     }
 
-    private fun getDummyMessages(): List<Message> {
-        return listOf(
-            Message(id = "1", sender = "User A", content = "Hello!", timestamp = 14012025),
-            Message(id = "2", sender = "User B", content = "Hi there!", timestamp = 14012025),
-            Message(id = "3", sender = "User C", content = "Hi there!", timestamp = 14012025),
-            Message(id = "4", sender = "User D", content = "Hi there!", timestamp = 14012025),
-            Message(id = "5", sender = "User E", content = "Hi there!", timestamp = 14012025),
-            Message(id = "6", sender = "User F", content = "Hi there!", timestamp = 14012025),
-            Message(id = "7", sender = "User G", content = "Hi there!", timestamp = 14012025),
-            Message(id = "8", sender = "User H", content = "Hi there!", timestamp = 14012025),
-            Message(id = "9", sender = "User I", content = "Hi there!", timestamp = 14012025)
-        )
-    }
 
     private fun setupSearchView() {
         binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {

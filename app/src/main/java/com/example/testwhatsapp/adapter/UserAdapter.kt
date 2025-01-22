@@ -1,21 +1,16 @@
 package com.example.testwhatsapp.adapter
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.testwhatsapp.databinding.ItemUserBinding
-import com.example.testwhatsapp.model.Message
 import com.example.testwhatsapp.model.User
 
-class UserAdapter(
-    private val onItemClick: (User) -> Unit
-) : RecyclerView.Adapter<UserAdapter.UserViewHolder>() {
+class UserAdapter(private val onItemClickListener: (User) -> Unit) : RecyclerView.Adapter<UserAdapter.UserViewHolder>() {
 
-
-    private val differCallback = object : DiffUtil.ItemCallback<User>() {
+    private val differCallBack = object : DiffUtil.ItemCallback<User>() {
         override fun areItemsTheSame(oldItem: User, newItem: User): Boolean {
             return oldItem.id == newItem.id
         }
@@ -25,7 +20,7 @@ class UserAdapter(
         }
     }
 
-    val differ = AsyncListDiffer(this, differCallback)
+    private val differ = AsyncListDiffer(this, differCallBack)
 
     class UserViewHolder(val binding: ItemUserBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -37,9 +32,8 @@ class UserAdapter(
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
         val user = differ.currentList[position]
         holder.binding.userNameTextView.text = user.name
-        Log.d("UserAdapter", "User clicked: ${user.name}")
         holder.itemView.setOnClickListener {
-            onItemClick(user)
+            onItemClickListener(user)
         }
     }
 

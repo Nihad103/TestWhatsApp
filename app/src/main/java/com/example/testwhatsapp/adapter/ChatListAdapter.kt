@@ -1,30 +1,31 @@
 package com.example.testwhatsapp.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.testwhatsapp.databinding.ItemChatBinding
-import com.example.testwhatsapp.model.Message
+import com.example.testwhatsapp.model.User
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ChatListAdapter(private var chatList: List<Message>) : RecyclerView.Adapter<ChatListAdapter.ChatViewHolder>() {
+class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<ChatListAdapter.ChatViewHolder>() {
 
-    private val differCallBack = object : DiffUtil.ItemCallback<Message>() {
-        override fun areItemsTheSame(oldItem: Message, newItem: Message): Boolean {
+    private val differCallBack = object : DiffUtil.ItemCallback<User>() {
+        override fun areItemsTheSame(oldItem: User, newItem: User): Boolean {
             return oldItem.id == newItem.id
         }
 
-        override fun areContentsTheSame(oldItem: Message, newItem: Message): Boolean {
+        override fun areContentsTheSame(oldItem: User, newItem: User): Boolean {
             return oldItem == newItem
         }
     }
     val differ = AsyncListDiffer(this, differCallBack)
 
-    private var onItemClickListener: ((Message) -> Unit)? = null
+    private var onItemClickListener: ((User) -> Unit)? = null
 
     class ChatViewHolder(val binding: ItemChatBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -34,12 +35,17 @@ class ChatListAdapter(private var chatList: List<Message>) : RecyclerView.Adapte
     }
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        val message = differ.currentList[position]
-        holder.binding.senderNameTextView.text = message.sender
-        holder.binding.textViewLastMessage.text = message.content
-        holder.binding.timeTextView.text = formatTimestamp(message.timestamp)
+        val user = differ.currentList[position]
+        holder.binding.senderNameTextView.text = user.name
+        if (user.lastMessage != null) {
+            holder.binding.textViewLastMessage.text = user.lastMessage
+        } else {
+            Log.d("ChatListAdapter", "last message error")
+            holder.binding.textViewLastMessage.text = "No message yet"
+        }
+        holder.binding.timeTextView.text = formatTimestamp(user.lastMessageTimestamp)
         holder.itemView.setOnClickListener {
-            onItemClickListener?.let { it(message) }
+            onItemClickListener?.let { it(user) }
         }
     }
 
@@ -49,14 +55,19 @@ class ChatListAdapter(private var chatList: List<Message>) : RecyclerView.Adapte
 
     private fun formatTimestamp(timestamp: Long): String {
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-        return sdf.format(Date(timestamp))
+        return if (timestamp > 0) {
+            sdf.format(Date(timestamp))
+        } else {
+            ""
+        }
     }
 
-    fun setOnItemClickListener(listener: (Message) -> Unit) {
+    fun setOnItemClickListener(listener: (User) -> Unit) {
         onItemClickListener = listener
     }
 
-    fun updateList(newList: List<Message>) {
+    fun updateList(newList: List<User>) {
         differ.submitList(newList)
+        notifyDataSetChanged()
     }
 }

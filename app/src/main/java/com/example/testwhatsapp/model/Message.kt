@@ -1,8 +1,8 @@
 package com.example.testwhatsapp.model
 
 data class Message(
-    val id: String = "",
-    val sender: String = "",
+    var id: String = "",
     val content: String = "",
-    val timestamp: Long = 0
+    val sender: String = "",
+    var timestamp: Long = 0,
 )

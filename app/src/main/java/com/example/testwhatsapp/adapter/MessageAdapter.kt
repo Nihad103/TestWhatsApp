@@ -11,7 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MessageAdapter(private val messageList: List<Message>) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
+class MessageAdapter(private val messageList: List<Message>, private val currentUserId: String) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
 
     class MessageViewHolder(val binding: ItemMessageBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -29,23 +29,33 @@ class MessageAdapter(private val messageList: List<Message>) : RecyclerView.Adap
         holder.binding.timeTextView.text = time
 
         val params = holder.binding.messageTextView.layoutParams as ConstraintLayout.LayoutParams
-        if (message.sender == "Me") {
-            holder.binding.messageTextView.setBackgroundResource(R.drawable.message_background)
+        if (message.sender == currentUserId) {
+            holder.binding.messageTextView.setBackgroundResource(R.drawable.message_background_right)
             params.startToStart = ConstraintLayout.LayoutParams.UNSET
             params.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
-            params.horizontalBias = 0.1f
+            params.horizontalBias = 1.0f
         } else {
-            holder.binding.messageTextView.setBackgroundResource(R.drawable.message_background)
+            holder.binding.messageTextView.setBackgroundResource(R.drawable.message_background_left)
             params.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
             params.endToEnd = ConstraintLayout.LayoutParams.UNSET
-            params.horizontalBias = 0.9f
+            params.horizontalBias = 0.0f
         }
         holder.binding.messageTextView.layoutParams = params
+
+        val timeParams = holder.binding.timeTextView.layoutParams as ConstraintLayout.LayoutParams
+        if (message.sender == currentUserId) {
+            timeParams.startToStart = ConstraintLayout.LayoutParams.UNSET
+            timeParams.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID
+            timeParams.horizontalBias = 1.0f
+        } else {
+            timeParams.startToStart = ConstraintLayout.LayoutParams.PARENT_ID
+            timeParams.endToEnd = ConstraintLayout.LayoutParams.UNSET
+            timeParams.horizontalBias = 0.0f
+        }
+        holder.binding.timeTextView.layoutParams = timeParams
     }
 
     override fun getItemCount(): Int {
         return messageList.size
     }
 }
-
-

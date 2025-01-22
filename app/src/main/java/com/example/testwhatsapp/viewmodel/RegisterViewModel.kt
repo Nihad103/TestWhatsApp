@@ -1,6 +1,7 @@
 package com.example.testwhatsapp.viewmodel
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -25,8 +26,7 @@ class RegisterViewModel(private val auth: FirebaseAuth, private val database: Fi
                 val result = auth.createUserWithEmailAndPassword(email, password).await()
                 val userId = result.user?.uid
                 if (userId != null) {
-                    val user = User(id = userId, name = userName, email = email)
-                    database.getReference("users").child(userId).setValue(user).await()
+                    createUser(userId, userName, email)
                     if (rememberMe) {
                         with(sharedPref.edit()) {
                             putBoolean("rememberMe", true)
@@ -40,6 +40,22 @@ class RegisterViewModel(private val auth: FirebaseAuth, private val database: Fi
             } catch (e: Exception) {
                 _registerErrorMessage.value = e.message ?: "Registration failed"
             }
+        }
+    }
+
+    private fun createUser(id: String, name: String, email: String) {
+        if (id.isNotEmpty() && name.isNotEmpty() && email.isNotEmpty()) {
+            val user = User(id, name, email, "Welcome to the chat!", System.currentTimeMillis())
+            database.getReference("users").child(id).setValue(user)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Log.d("CreateUser", "User created successfully")
+                    } else {
+                        Log.e("CreateUser", "User creation failed: ${task.exception?.message}")
+                    }
+                }
+        } else {
+            Log.e("CreateUser", "Invalid user data: id, name or email is empty")
         }
     }
 }
