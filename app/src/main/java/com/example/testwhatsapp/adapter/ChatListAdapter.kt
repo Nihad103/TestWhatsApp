@@ -1,6 +1,5 @@
 package com.example.testwhatsapp.adapter
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.AsyncListDiffer
@@ -23,6 +22,7 @@ class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<C
             return oldItem == newItem
         }
     }
+
     val differ = AsyncListDiffer(this, differCallBack)
 
     private var onItemClickListener: ((User) -> Unit)? = null
@@ -36,14 +36,19 @@ class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<C
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
         val user = differ.currentList[position]
+
+        // User name
         holder.binding.senderNameTextView.text = user.name
-        if (user.lastMessage != null) {
-            holder.binding.textViewLastMessage.text = user.lastMessage
-        } else {
-            Log.d("ChatListAdapter", "last message error")
-            holder.binding.textViewLastMessage.text = "No message yet"
-        }
-        holder.binding.timeTextView.text = formatTimestamp(user.lastMessageTimestamp)
+
+        // Get the most recent chat's last message
+        val lastMessage = user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessage
+        holder.binding.textViewLastMessage.text = lastMessage ?: "No message yet"
+
+        // Format the timestamp of the last message
+        val lastMessageTimestamp = user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp
+        holder.binding.timeTextView.text = if (lastMessageTimestamp != null) formatTimestamp(lastMessageTimestamp) else ""
+
+        // Handle item click
         holder.itemView.setOnClickListener {
             onItemClickListener?.let { it(user) }
         }
@@ -68,6 +73,5 @@ class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<C
 
     fun updateList(newList: List<User>) {
         differ.submitList(newList)
-        notifyDataSetChanged()
     }
 }

@@ -32,6 +32,7 @@ class ChatListFragment : Fragment() {
     private lateinit var userAdapter: UserAdapter
     private val users = mutableListOf<User>()
     private lateinit var auth: FirebaseAuth
+    private val allUsers = mutableListOf<User>()
 
     private val chatListViewModel: ChatListViewModel by inject()
 
@@ -58,15 +59,28 @@ class ChatListFragment : Fragment() {
     }
 
     private fun observeUsers() {
-        chatListViewModel.fetchUsers().observe(viewLifecycleOwner, Observer { userList ->
+        chatListViewModel.fetchUsers().observe(viewLifecycleOwner, Observer { userList: List<User> ->
+            allUsers.clear() // Əvvəlki siyahını təmizlə
             users.clear()
+
             if (userList != null && userList.isNotEmpty()) {
-                users.addAll(userList.sortedByDescending { it.lastMessageTimestamp })
+                allUsers.addAll(userList) // Bütün istifadəçiləri saxla
+
+                // Aktiv çatları olan istifadəçiləri filtr edin
+                val filteredList = userList.filter { user ->
+                    user.chats?.any { chat -> chat.value.lastMessage?.isNotEmpty() == true } == true
+                }
+
+                // Son mesajın zamanına görə sıralayın
+                val sortedList = filteredList.sortedByDescending { user ->
+                    user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp ?: 0L
+                }
+
+                users.addAll(sortedList)
                 userAdapter.updateList(users)
                 chatListAdapter.updateList(users)
                 userAdapter.notifyDataSetChanged()
                 chatListAdapter.notifyDataSetChanged()
-                Log.d("ChatListFragment", "observeUsers")
             } else {
                 Log.d("ChatListFragment", "No users found")
             }
@@ -120,7 +134,7 @@ class ChatListFragment : Fragment() {
     }
 
     private fun filterUsers(query: String) {
-        val filteredList = users.filter {
+        val filteredList = allUsers.filter {
             it.name.contains(query, ignoreCase = true)
         }
         userAdapter.updateList(filteredList)

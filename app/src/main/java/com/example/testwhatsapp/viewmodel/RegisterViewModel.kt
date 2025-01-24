@@ -45,7 +45,14 @@ class RegisterViewModel(private val auth: FirebaseAuth, private val database: Fi
 
     private fun createUser(id: String, name: String, email: String) {
         if (id.isNotEmpty() && name.isNotEmpty() && email.isNotEmpty()) {
-            val user = User(id, name, email, "Welcome to the chat!", System.currentTimeMillis())
+            // Yeni `User` obyektini modelə uyğun yaradın
+            val user = User(
+                id = id,
+                name = name,
+                email = email,
+                chats = null, // Qeydiyyat zamanı `chats` boş qalır
+                lastMessageTimestamp = System.currentTimeMillis() // Mövcud vaxt təyin olunur
+            )
             database.getReference("users").child(id).setValue(user)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
@@ -58,4 +65,5 @@ class RegisterViewModel(private val auth: FirebaseAuth, private val database: Fi
             Log.e("CreateUser", "Invalid user data: id, name or email is empty")
         }
     }
+
 }

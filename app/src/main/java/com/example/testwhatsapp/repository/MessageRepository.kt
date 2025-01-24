@@ -62,25 +62,17 @@ class MessageRepository {
             "lastMessage" to lastMessage,
             "lastMessageTimestamp" to timestamp
         )
+
+        // Göndərən və alıcı üçün yeniləmələri əlavə et
+        database.child("users").child(senderId).child("chats").child(chatId).updateChildren(userUpdates)
+        database.child("users").child(receiverId).child("chats").child(chatId).updateChildren(userUpdates)
+
+        // Çatın özünü də yenilə
         val chatUpdates = mapOf(
             "lastMessage" to lastMessage,
             "lastMessageTimestamp" to timestamp
         )
-        database.child("users").child(receiverId).updateChildren(userUpdates)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("UpdateLastMessage", "Last message and timestamp updated successfully for user $senderId")
-                } else {
-                    Log.e("UpdateLastMessage", "Update failed for $senderId: ${task.exception?.message}")
-                }
-            }
         database.child("chats").child(chatId).updateChildren(chatUpdates)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("UpdateLastMessage", "Last message and timestamp updated successfully for chat $senderId-$receiverId")
-                } else {
-                    Log.e("UpdateLastMessage", "Update failed for $senderId-$receiverId: ${task.exception?.message}")
-                }
-            }
     }
+
 }
