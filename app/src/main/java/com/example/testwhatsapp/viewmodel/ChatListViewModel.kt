@@ -7,7 +7,7 @@ import com.example.testwhatsapp.repository.ChatListRepository
 
 class ChatListViewModel(private val repository: ChatListRepository) : ViewModel() {
 
-    fun fetchUsers(): LiveData<List<User>> {
-        return repository.fetchUsers()
+    fun fetchUsers(currentUserId: String): LiveData<List<User>> {
+        return repository.fetchUser(currentUserId)
     }
 }

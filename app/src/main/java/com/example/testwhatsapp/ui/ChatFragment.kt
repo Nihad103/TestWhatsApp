@@ -33,7 +33,7 @@ class ChatFragment : Fragment() {
     private val messages = mutableListOf<Message>()
     private lateinit var database: DatabaseReference
     private var userId: String? = null
-    private lateinit var auth: FirebaseAuth
+    private val auth: FirebaseAuth by inject()
     private val chatViewModel: ChatViewModel by inject()
 
     override fun onCreateView(
@@ -45,7 +45,6 @@ class ChatFragment : Fragment() {
         _binding = FragmentChatBinding.inflate(inflater, container, false)
         activity?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
                 WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        auth = FirebaseAuth.getInstance()
         return binding.root
     }
 
@@ -64,6 +63,7 @@ class ChatFragment : Fragment() {
         getUserName(userId)
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     private fun observeMessages(chatId: String) {
         chatViewModel.fetchMessages(chatId).observe(viewLifecycleOwner, Observer { messageList -> messages.clear()
         messages.addAll(messageList)
@@ -122,6 +122,7 @@ class ChatFragment : Fragment() {
         return if (userId1 < userId2) "$userId1-$userId2" else "$userId2-$userId1"
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onPrepareOptionsMenu(menu: Menu) {
         super.onPrepareOptionsMenu(menu)
         menu.findItem(R.id.action_delete_account)?.isVisible = false

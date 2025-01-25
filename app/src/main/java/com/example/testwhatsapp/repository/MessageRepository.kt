@@ -8,6 +8,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.GenericTypeIndicator
 import com.google.firebase.database.ValueEventListener
 
 class MessageRepository {
@@ -16,22 +17,22 @@ class MessageRepository {
 
     fun fetchMessages(chatId: String): LiveData<List<Message>> {
         val messagesLiveData = MutableLiveData<List<Message>>()
-        database.child("chats").child(chatId).addValueEventListener(object : ValueEventListener {
+        database.child("messages").child(chatId).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val messages = mutableListOf<Message>()
+                val lastMessage = snapshot.child("lastMessage").getValue(String::class.java) ?: "No last message"
+                val lastMessageTimestamp = snapshot.child("lastMessageTimestamp").getValue(Long::class.java) ?: 0L
+
+                Log.d("FetchMessages", "Last message: $lastMessage at $lastMessageTimestamp")
+
                 for (messageSnapshot in snapshot.children) {
                     try {
-                        // Verilerin doğru formatta olup olmadığını kontrol et
-                        val messageMap = messageSnapshot.value as? Map<String, Any>
-                        if (messageMap != null && messageMap.containsKey("content") && messageMap.containsKey("timestamp")) {
+                        if (messageSnapshot.key != "lastMessage" && messageSnapshot.key != "lastMessageTimestamp") {
                             val message = messageSnapshot.getValue(Message::class.java)
                             if (message != null) {
                                 messages.add(message)
-                            } else {
-                                Log.e("FetchMessages", "Message is null or could not be converted")
+                                Log.d("FetchMessages", "Message added: $message")
                             }
-                        } else {
-                            Log.e("FetchMessages", "Message data is not in expected format: ${messageSnapshot.value}")
                         }
                     } catch (e: Exception) {
                         Log.e("FetchMessages", "Error converting message: ${e.message}")
@@ -41,7 +42,7 @@ class MessageRepository {
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e("FetchMessages", "Error: ${error.message}")
+                Log.e("FetchMessages", "OnCancelled: ${error.message}")
             }
         })
         return messagesLiveData
@@ -51,10 +52,11 @@ class MessageRepository {
         val messageId = database.child("chats").child(chatId).push().key
         if (messageId != null) {
             val timestamp = System.currentTimeMillis()
-            message.id = messageId
-            message.timestamp = timestamp
-            database.child("chats").child(chatId).child(messageId).setValue(message)
-            updateLastMessage(senderId = message.sender, receiverId = receiverId, chatId = chatId, lastMessage = message.content, timestamp = timestamp)        }
+            val senderId = message.sender
+            val newMessage = message.copy(id = messageId, timestamp = timestamp, receiver = receiverId)
+            database.child("messages").child(chatId).child(messageId).setValue(newMessage)
+            updateLastMessage(senderId, receiverId, chatId, newMessage.content, timestamp)
+        }
     }
 
     private fun updateLastMessage(senderId: String, receiverId: String, chatId: String, lastMessage: String, timestamp: Long) {
@@ -62,17 +64,8 @@ class MessageRepository {
             "lastMessage" to lastMessage,
             "lastMessageTimestamp" to timestamp
         )
-
-        // Göndərən və alıcı üçün yeniləmələri əlavə et
         database.child("users").child(senderId).child("chats").child(chatId).updateChildren(userUpdates)
         database.child("users").child(receiverId).child("chats").child(chatId).updateChildren(userUpdates)
-
-        // Çatın özünü də yenilə
-        val chatUpdates = mapOf(
-            "lastMessage" to lastMessage,
-            "lastMessageTimestamp" to timestamp
-        )
-        database.child("chats").child(chatId).updateChildren(chatUpdates)
     }
 
 }

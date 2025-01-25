@@ -31,9 +31,8 @@ class ChatListFragment : Fragment() {
     private lateinit var chatListAdapter: ChatListAdapter
     private lateinit var userAdapter: UserAdapter
     private val users = mutableListOf<User>()
-    private lateinit var auth: FirebaseAuth
+    private val auth: FirebaseAuth by inject()
     private val allUsers = mutableListOf<User>()
-
     private val chatListViewModel: ChatListViewModel by inject()
 
     override fun onCreateView(
@@ -46,12 +45,6 @@ class ChatListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        auth = FirebaseAuth.getInstance()
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            findNavController().navigate(R.id.loginFragment)
-            return
-        }
         setupSearchView()
         setupRecyclerView()
         observeUsers()
@@ -59,34 +52,48 @@ class ChatListFragment : Fragment() {
     }
 
     private fun observeUsers() {
-        chatListViewModel.fetchUsers().observe(viewLifecycleOwner, Observer { userList: List<User> ->
-            allUsers.clear() // Əvvəlki siyahını təmizlə
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            findNavController().navigate(R.id.loginFragment)
+            return
+        }
+
+        val currentUserId = currentUser.uid
+        chatListViewModel.fetchUsers(currentUserId).observe(viewLifecycleOwner, Observer { userList ->
+            allUsers.clear()
             users.clear()
 
-            if (userList != null && userList.isNotEmpty()) {
-                allUsers.addAll(userList) // Bütün istifadəçiləri saxla
+            if (userList.isNotEmpty()) {
+                allUsers.addAll(userList)
+                Log.d("ChatListFragment", "Users list size: ${users.size}")
 
-                // Aktiv çatları olan istifadəçiləri filtr edin
                 val filteredList = userList.filter { user ->
-                    user.chats?.any { chat -> chat.value.lastMessage?.isNotEmpty() == true } == true
+                    user.chats?.any { chat ->
+                        // Burada həm sender, həm də receiver üçün filtrasiya aparırıq
+                        (chat.value.sender == currentUserId || chat.value.receiver == currentUserId) &&
+                                chat.value.lastMessage?.isNotEmpty() ?: true
+                    } == true
                 }
+                Log.d("ChatListFragment", "Filtered list size: ${filteredList.size}")
 
-                // Son mesajın zamanına görə sıralayın
+
                 val sortedList = filteredList.sortedByDescending { user ->
-                    user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp ?: 0L
+                    // Hər bir istifadəçinin ən son mesajını (timestamp-ə əsaslanaraq) əldə edirik
+                    user.chats?.values?.filter {
+                        it.sender == currentUserId || it.receiver == currentUserId
+                    }?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp ?: 0L
                 }
 
                 users.addAll(sortedList)
-                userAdapter.updateList(users)
                 chatListAdapter.updateList(users)
-                userAdapter.notifyDataSetChanged()
+                userAdapter.updateList(users)
                 chatListAdapter.notifyDataSetChanged()
+                userAdapter.notifyDataSetChanged()
             } else {
                 Log.d("ChatListFragment", "No users found")
             }
         })
     }
-
 
     private fun setupRecyclerView() {
         // UserAdapter
@@ -108,7 +115,6 @@ class ChatListFragment : Fragment() {
             findNavController().navigate(action)
         }
     }
-
 
     private fun setupSearchView() {
         binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {

@@ -7,41 +7,48 @@ import com.example.testwhatsapp.model.User
 import com.google.firebase.database.*
 
 class ChatListRepository {
+
     private val database: DatabaseReference = FirebaseDatabase.getInstance().getReference("users")
 
-    fun fetchUsers(): LiveData<List<User>> {
+    fun fetchUser(currentUserId: String): LiveData<List<User>> {
         val usersLiveData = MutableLiveData<List<User>>()
-        database.addValueEventListener(object : ValueEventListener {
+
+        database.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val users = mutableListOf<User>()
                 for (data in snapshot.children) {
-                    val user = data.getValue(User::class.java)
-                    if (user != null) {
-                        if (user.id.isNotEmpty() && user.name.isNotEmpty()) {
-                            // Find the latest message timestamp in the user's chats
-                            val lastMessageTimestamp = user.chats?.values
-                                ?.maxByOrNull { it.lastMessageTimestamp }
-                                ?.lastMessageTimestamp ?: 0L
+                    try {
+                        val user = data.getValue(User::class.java)
+                        if (user != null && user.id.isNotBlank() && user.name.isNotBlank()) {
+                            // if lastMesssage isn't empty
+                            val userChats = user.chats?.filter { (_, chat) ->
+                                chat.lastMessage?.isNotBlank() ?: true
+                            }
 
-                            // Update the user with the last message timestamp
-                            val updatedUser = user.copy(lastMessageTimestamp = lastMessageTimestamp)
-                            users.add(updatedUser)
-                            Log.e("ChatListRepository", "$user != null")
+                            if (userChats != null && userChats.isNotEmpty()) {
+                                users.add(user.copy(chats = userChats))
+                            } else {
+                                users.add(user.copy(chats = userChats ?: emptyMap()))
+                            }
+
                         } else {
-                            Log.e("ChatListRepository", "Invalid user data: $user")
+                            Log.w("ChatListRepository", "Invalid or incomplete user data: $user")
                         }
-                    } else {
-                        Log.e("ChatListRepository", "User is null")
+                    } catch (e: Exception) {
+                        Log.e("ChatListRepository", "Error parsing user data: ${e.message}")
                     }
                 }
-                // Sort users by the latest lastMessageTimestamp
-                users.sortByDescending { it.lastMessageTimestamp }
+
+                users.sortByDescending { user ->
+                    user.chats!!.values.maxOfOrNull { it.lastMessageTimestamp } ?: 0L
+                }
+
                 usersLiveData.value = users
-                Log.d("ChatListRepository", "Users fetched: ${users.size}")
+                Log.d("ChatListRepository", "Users fetched and sorted: ${users.size}")
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.d("ChatListRepository", "onCancelled")
+                Log.e("ChatListRepository", "Database error: ${error.message}")
             }
         })
 

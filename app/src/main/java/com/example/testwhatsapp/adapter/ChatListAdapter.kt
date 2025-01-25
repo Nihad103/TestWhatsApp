@@ -1,5 +1,6 @@
 package com.example.testwhatsapp.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.AsyncListDiffer
@@ -36,15 +37,11 @@ class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<C
 
     override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
         val user = differ.currentList[position]
-
-        // User name
         holder.binding.senderNameTextView.text = user.name
 
-        // Get the most recent chat's last message
         val lastMessage = user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessage
         holder.binding.textViewLastMessage.text = lastMessage ?: "No message yet"
 
-        // Format the timestamp of the last message
         val lastMessageTimestamp = user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp
         holder.binding.timeTextView.text = if (lastMessageTimestamp != null) formatTimestamp(lastMessageTimestamp) else ""
 
@@ -73,5 +70,7 @@ class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<C
 
     fun updateList(newList: List<User>) {
         differ.submitList(newList)
+        notifyDataSetChanged()
+        Log.d("ChatListAdapter", "Submitted list size: ${newList.size}")
     }
 }
