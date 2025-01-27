@@ -105,7 +105,7 @@ class ChatFragment : Fragment() {
             val messageContent = binding.messageEditText.text.toString().trim()
             if (messageContent.isNotEmpty()) {
                 val newMessage = Message(
-                    id = "",
+                    messageId = "",
                     sender = auth.currentUser?.uid ?: "Unknown",
                     content = messageContent,
                     timestamp = System.currentTimeMillis()

@@ -49,7 +49,6 @@ class RegisterViewModel(private val auth: FirebaseAuth, private val database: Fi
                 id = id,
                 name = name,
                 email = email,
-                chats = null
             )
             database.getReference("users").child(id).setValue(user)
                 .addOnCompleteListener { task ->

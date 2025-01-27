@@ -7,47 +7,46 @@ import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.example.testwhatsapp.databinding.ItemChatBinding
+import com.example.testwhatsapp.model.ChatList
 import com.example.testwhatsapp.model.User
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
-class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<ChatListAdapter.ChatViewHolder>() {
+class ChatListAdapter(private var chatList: List<ChatList>) : RecyclerView.Adapter<ChatListAdapter.ChatListViewHolder>() {
 
-    private val differCallBack = object : DiffUtil.ItemCallback<User>() {
-        override fun areItemsTheSame(oldItem: User, newItem: User): Boolean {
-            return oldItem.id == newItem.id
+    private val differCallBack = object : DiffUtil.ItemCallback<ChatList>() {
+        override fun areItemsTheSame(oldItem: ChatList, newItem: ChatList): Boolean {
+            return oldItem.chatId == newItem.chatId
         }
 
-        override fun areContentsTheSame(oldItem: User, newItem: User): Boolean {
+        override fun areContentsTheSame(oldItem: ChatList, newItem: ChatList): Boolean {
             return oldItem == newItem
         }
     }
 
-    val differ = AsyncListDiffer(this, differCallBack)
+    private val differ = AsyncListDiffer(this, differCallBack)
 
     private var onItemClickListener: ((User) -> Unit)? = null
 
-    class ChatViewHolder(val binding: ItemChatBinding) : RecyclerView.ViewHolder(binding.root)
+    class ChatListViewHolder(val binding: ItemChatBinding) : RecyclerView.ViewHolder(binding.root)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatListViewHolder {
         val binding = ItemChatBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return ChatViewHolder(binding)
+        return ChatListViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        val user = differ.currentList[position]
-        holder.binding.senderNameTextView.text = user.name
+    override fun onBindViewHolder(holder: ChatListViewHolder, position: Int) {
+        val chat = differ.currentList[position]
 
-        val lastMessage = user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessage
-        holder.binding.textViewLastMessage.text = lastMessage ?: "No message yet"
+        holder.binding.textViewLastMessage.text = chat.lastMessage
+        holder.binding.receiverNameTextView.text = chat.receiverName
+        holder.binding.timeTextView.text = java.text.SimpleDateFormat("HH:mm").format(chat.lastMessageTimestamp)
 
-        val lastMessageTimestamp = user.chats?.values?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp
-        holder.binding.timeTextView.text = if (lastMessageTimestamp != null) formatTimestamp(lastMessageTimestamp) else ""
-
-        // Handle item click
-        holder.itemView.setOnClickListener {
-            onItemClickListener?.let { it(user) }
+            holder.itemView.setOnClickListener {
+                val user = User(chat.chatId, chat.receiverName, "")
+                onItemClickListener?.let { it(user) }
         }
     }
 
@@ -55,22 +54,26 @@ class ChatListAdapter(private var userList: List<User>) : RecyclerView.Adapter<C
         return differ.currentList.size
     }
 
-    private fun formatTimestamp(timestamp: Long): String {
-        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-        return if (timestamp > 0) {
-            sdf.format(Date(timestamp))
-        } else {
-            ""
-        }
-    }
-
     fun setOnItemClickListener(listener: (User) -> Unit) {
         onItemClickListener = listener
     }
 
-    fun updateList(newList: List<User>) {
+    fun submitList(newList: List<ChatList>) {
         differ.submitList(newList)
-        notifyDataSetChanged()
-        Log.d("ChatListAdapter", "Submitted list size: ${newList.size}")
+    }
+
+    private fun findUserByName(receiverName: String, callback: (User) -> Unit) {
+        val userRef = FirebaseDatabase.getInstance().getReference("users")
+        userRef.orderByChild("name").equalTo(receiverName)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val user = snapshot.children.firstOrNull()?.getValue(User::class.java)
+                    user?.let { callback(it) }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("ChatListAdapter", "Error fetching user by name: ${error.message}")
+                }
+            })
     }
 }

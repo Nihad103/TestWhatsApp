@@ -8,14 +8,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.SearchView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.Observer
+import androidx.lifecycle.observe
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.testwhatsapp.R
 import com.example.testwhatsapp.adapter.ChatListAdapter
 import com.example.testwhatsapp.adapter.UserAdapter
 import com.example.testwhatsapp.databinding.FragmentChatListBinding
 import com.example.testwhatsapp.model.User
+import com.example.testwhatsapp.repository.UserRepository
 import com.example.testwhatsapp.viewmodel.ChatListViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -28,109 +28,76 @@ class ChatListFragment : Fragment() {
 
     private var _binding: FragmentChatListBinding? = null
     private val binding get() = _binding!!
+    private val auth: FirebaseAuth by inject()
+    private val chatListViewModel: ChatListViewModel by inject()
     private lateinit var chatListAdapter: ChatListAdapter
     private lateinit var userAdapter: UserAdapter
-    private val users = mutableListOf<User>()
-    private val auth: FirebaseAuth by inject()
     private val allUsers = mutableListOf<User>()
-    private val chatListViewModel: ChatListViewModel by inject()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         _binding = FragmentChatListBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupSearchView()
-        setupRecyclerView()
-        observeUsers()
+
         setupActionBarTitle()
+        setupAdapters()
+        setupObservers()
+        setupSearchView()
+
+        loadChatList()
+        loadAllUsers()
     }
 
-    private fun observeUsers() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            findNavController().navigate(R.id.loginFragment)
-            return
+    private fun setupAdapters() {
+        chatListAdapter = ChatListAdapter(emptyList())
+        binding.chatRecyclerView.apply {
+            adapter = chatListAdapter
+            layoutManager = LinearLayoutManager(context)
         }
-
-        val currentUserId = currentUser.uid
-        chatListViewModel.fetchUsers(currentUserId).observe(viewLifecycleOwner, Observer { userList ->
-            allUsers.clear()
-            users.clear()
-
-            if (userList.isNotEmpty()) {
-                allUsers.addAll(userList)
-                Log.d("ChatListFragment", "Users list size: ${users.size}")
-
-                val filteredList = userList.filter { user ->
-                    user.chats?.any { chat ->
-                        // Burada həm sender, həm də receiver üçün filtrasiya aparırıq
-                        (chat.value.sender == currentUserId || chat.value.receiver == currentUserId) &&
-                                chat.value.lastMessage?.isNotEmpty() ?: true
-                    } == true
-                }
-                Log.d("ChatListFragment", "Filtered list size: ${filteredList.size}")
-
-
-                val sortedList = filteredList.sortedByDescending { user ->
-                    // Hər bir istifadəçinin ən son mesajını (timestamp-ə əsaslanaraq) əldə edirik
-                    user.chats?.values?.filter {
-                        it.sender == currentUserId || it.receiver == currentUserId
-                    }?.maxByOrNull { it.lastMessageTimestamp }?.lastMessageTimestamp ?: 0L
-                }
-
-                users.addAll(sortedList)
-                chatListAdapter.updateList(users)
-                userAdapter.updateList(users)
-                chatListAdapter.notifyDataSetChanged()
-                userAdapter.notifyDataSetChanged()
-            } else {
-                Log.d("ChatListFragment", "No users found")
-            }
-        })
-    }
-
-    private fun setupRecyclerView() {
-        // UserAdapter
         userAdapter = UserAdapter { user ->
-            Log.d("ChatListFragment", "chatList to chat with userId: ${user.name}")
             val action = ChatListFragmentDirections.actionChatListFragmentToChatFragment(user.id)
             findNavController().navigate(action)
         }
-        binding.usersRecyclerView.adapter = userAdapter
-        binding.usersRecyclerView.layoutManager = LinearLayoutManager(context)
-
-        // ChatListAdapter
-        chatListAdapter = ChatListAdapter(users)
-        binding.chatRecyclerView.adapter = chatListAdapter
-        binding.chatRecyclerView.layoutManager = LinearLayoutManager(context)
-        binding.chatRecyclerView.visibility = View.VISIBLE
+        binding.usersRecyclerView.apply {
+            adapter = userAdapter
+            layoutManager = LinearLayoutManager(context)
+        }
         chatListAdapter.setOnItemClickListener { user ->
             val action = ChatListFragmentDirections.actionChatListFragmentToChatFragment(user.id)
             findNavController().navigate(action)
         }
     }
 
+    private fun setupObservers() {
+        chatListViewModel.chatList.observe(viewLifecycleOwner) { chatList ->
+            if (chatList.isEmpty()) {
+                Log.d("ChatListFragment", "Chat list is empty")
+                binding.noResultsTextView.visibility = View.VISIBLE
+            } else {
+                Log.d("ChatListFragment", "Chat list size: ${chatList.size}")
+                binding.noResultsTextView.visibility = View.GONE
+            }
+            chatListAdapter.submitList(chatList)
+        }
+
+    }
+
     private fun setupSearchView() {
         binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                query?.let {
-                    filterUsers(it)
-                }
+                query?.let { filterUsers(it) }
                 return true
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 if (newText.isNullOrEmpty()) {
-                    userAdapter.updateList(users)
-                    binding.chatRecyclerView.visibility = View.VISIBLE
-                    binding.usersRecyclerView.visibility = View.GONE
-                    binding.noResultsTextView.visibility = View.GONE
+                    resetUserSearch()
                 } else {
                     filterUsers(newText)
                 }
@@ -140,40 +107,58 @@ class ChatListFragment : Fragment() {
     }
 
     private fun filterUsers(query: String) {
-        val filteredList = allUsers.filter {
-            it.name.contains(query, ignoreCase = true)
-        }
-        userAdapter.updateList(filteredList)
+        val filteredList = allUsers.filter { it.name.contains(query, ignoreCase = true) }
         if (filteredList.isEmpty()) {
             binding.usersRecyclerView.visibility = View.GONE
             binding.noResultsTextView.visibility = View.VISIBLE
-            binding.noResultsTextView.text = "No user found"
+            binding.chatRecyclerView.visibility = View.GONE
+            binding.noResultsTextView.text = "No Result"
         } else {
+            userAdapter.updateList(filteredList)
             binding.usersRecyclerView.visibility = View.VISIBLE
             binding.noResultsTextView.visibility = View.GONE
             binding.chatRecyclerView.visibility = View.GONE
         }
-        Log.d("FilterUsers", "Filtered list size: ${filteredList.size}")
+    }
+
+    private fun resetUserSearch() {
+        userAdapter.updateList(allUsers)
+        binding.chatRecyclerView.visibility = View.VISIBLE
+        binding.usersRecyclerView.visibility = View.GONE
+        binding.noResultsTextView.visibility = View.GONE
+    }
+
+    private fun loadChatList() {
+        val userId = auth.currentUser?.uid ?: return
+        Log.d("ChatListFragment", "Current userId: $userId")
+
+        chatListViewModel.loadChatList(userId)
+    }
+
+    private fun loadAllUsers() {
+        val userRepository = UserRepository()
+        userRepository.loadAllUsers({ users ->
+            allUsers.clear()
+            allUsers.addAll(users)
+            userAdapter.updateList(allUsers)
+        }, { error ->
+            Log.e("ChatListFragment", "Error loading users: ${error.message}")
+        })
     }
 
     private fun setupActionBarTitle() {
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-            val userId = currentUser.uid
-            val userRef = FirebaseDatabase.getInstance().getReference("users").child(userId)
-            userRef.addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val userName = snapshot.child("name").value as? String
-                    if (userName != null) {
-                        (activity as AppCompatActivity).supportActionBar?.title = userName
-                    }
-                }
+        val currentUser = auth.currentUser ?: return
+        val userRef = FirebaseDatabase.getInstance().getReference("users").child(currentUser.uid)
+        userRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val userName = snapshot.child("name").value as? String
+                (activity as? AppCompatActivity)?.supportActionBar?.title = userName ?: ""
+            }
 
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e("ChatListFragment", "Failed to fetch user name: ${error.message}")
-                }
-            })
-        }
+            override fun onCancelled(error: DatabaseError) {
+                Log.e("ChatListFragment", "Failed to fetch user name: ${error.message}")
+            }
+        })
     }
 
     override fun onDestroyView() {
