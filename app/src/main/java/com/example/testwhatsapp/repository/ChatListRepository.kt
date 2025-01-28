@@ -14,6 +14,7 @@ class ChatListRepository {
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val chatList = mutableListOf<ChatList>()
+                    var processedCount = 0 // İşlenen chat sayısını takip etmek için
 
                     for (chatSnapshot in snapshot.children) {
                         val chatId = chatSnapshot.key ?: continue
@@ -25,7 +26,16 @@ class ChatListRepository {
                         val userRef = FirebaseDatabase.getInstance().getReference("users").child(receiverId)
                         userRef.child("name").addListenerForSingleValueEvent(object : ValueEventListener {
                             override fun onDataChange(receiverSnapshot: DataSnapshot) {
-                                val receiverName = receiverSnapshot.value as? String ?: "Unknown"
+                                processedCount++
+                                val receiverName = receiverSnapshot.value as? String
+
+                                if (!receiverSnapshot.exists() || receiverName == null || receiverName == "Unknown") {
+                                    if (processedCount == snapshot.childrenCount.toInt()) {
+                                        chatList.sortByDescending { it.lastMessageTimestamp }
+                                        onResult(chatList)
+                                    }
+                                    return
+                                }
 
                                 val chat = ChatList(
                                     chatId = chatId,
@@ -35,7 +45,7 @@ class ChatListRepository {
                                 )
                                 chatList.add(chat)
 
-                                if (chatList.size == snapshot.childrenCount.toInt()) {
+                                if (processedCount == snapshot.childrenCount.toInt()) {
                                     chatList.sortByDescending { it.lastMessageTimestamp }
                                     onResult(chatList)
                                 }
@@ -46,6 +56,10 @@ class ChatListRepository {
                                 onError(error)
                             }
                         })
+                    }
+
+                    if (!snapshot.exists() || snapshot.childrenCount == 0L) {
+                        onResult(emptyList())
                     }
                 }
 

@@ -18,8 +18,12 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.example.testwhatsapp.R
+import com.example.testwhatsapp.model.Chat
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class MainActivity : AppCompatActivity() {
 
@@ -91,9 +95,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         val userId = currentUser.uid
-        val databaseReference = FirebaseDatabase.getInstance().getReference("users")
-        databaseReference.child(userId).removeValue().addOnCompleteListener { removeTask ->
+        val database = FirebaseDatabase.getInstance()
+        val userRef = database.getReference("users").child(userId)
+        val chatListRef = database.getReference("chatList")
+        val chatsRef = database.getReference("chats")
+
+        userRef.removeValue().addOnCompleteListener { removeTask ->
             if (removeTask.isSuccessful) {
+                chatListRef.child(userId).removeValue()
+
+                chatsRef.addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        for (chatSnapshot in snapshot.children) {
+                            val chat = chatSnapshot.getValue(Chat::class.java)
+                            if (chat != null && chat.participants.contains(userId)) {
+                                chatsRef.child(chat.chatId).removeValue()
+                            }
+                        }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                        Log.e("DeleteAccount", "Error removing chats: ${error.message}")
+                    }
+                })
+
                 currentUser.delete().addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         Toast.makeText(this, "User deleted successfully.", Toast.LENGTH_SHORT).show()
@@ -114,6 +139,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
 
     private fun logout() {
         FirebaseAuth.getInstance().signOut()

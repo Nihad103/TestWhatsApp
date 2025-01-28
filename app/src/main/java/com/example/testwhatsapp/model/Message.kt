@@ -6,4 +6,6 @@ data class Message(
     val sender: String = "",
     val receiver: String = "",
     val timestamp: Long = 0L,
+    val messageType: String = "text",
+    val mediaContent: String? = null
 )

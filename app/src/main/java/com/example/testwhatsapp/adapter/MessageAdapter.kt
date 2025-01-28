@@ -1,9 +1,13 @@
 package com.example.testwhatsapp.adapter
 
+import android.graphics.BitmapFactory
+import android.util.Base64
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.testwhatsapp.R
 import com.example.testwhatsapp.databinding.ItemMessageBinding
 import com.example.testwhatsapp.model.Message
@@ -25,7 +29,25 @@ class MessageAdapter(
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
         val message = messageList[position]
-        holder.binding.messageTextView.text = message.content
+
+        if (message.messageType == "media") {
+            holder.binding.messageTextView.visibility = View.GONE
+            holder.binding.mediaImageView.visibility = View.VISIBLE
+
+            val mediaContent = message.mediaContent
+            if (mediaContent != null) {
+                val byteArray = Base64.decode(mediaContent, Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+                holder.binding.mediaImageView.setImageBitmap(bitmap)
+            } else {
+                holder.binding.mediaImageView.setImageResource(R.drawable.error_image)
+            }
+        } else {
+            holder.binding.messageTextView.visibility = View.VISIBLE
+            holder.binding.mediaImageView.visibility = View.GONE
+            holder.binding.messageTextView.text = message.content
+        }
+
 
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         val time = sdf.format(Date(message.timestamp))

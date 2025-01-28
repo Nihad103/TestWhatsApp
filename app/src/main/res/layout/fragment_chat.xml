@@ -43,12 +43,21 @@
             android:background="@drawable/edit_text_background"/>
 
         <Button
+            android:id="@+id/attachMediaButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Attach Media"
+            android:padding="8dp"
+            android:background="@drawable/attach_media_button_background"/>
+
+        <Button
             android:id="@+id/sendButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Send"
             android:padding="8dp"
             android:background="@drawable/send_button_background"/>
+
     </LinearLayout>
 
 </RelativeLayout>

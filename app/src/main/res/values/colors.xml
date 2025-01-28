@@ -4,4 +4,5 @@
     <color name="white">#FFFFFFFF</color>
     <color name="appBar">#0830FF</color>
     <color name="statusColor">#0013CC</color>
+    <color name="light_gray">#D3D3D3</color>
 </resources>

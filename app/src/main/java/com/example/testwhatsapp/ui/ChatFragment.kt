@@ -1,13 +1,24 @@
 package com.example.testwhatsapp.ui
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
+import android.util.Base64
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.navigation.fragment.findNavController
@@ -20,10 +31,10 @@ import com.example.testwhatsapp.viewmodel.ChatViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import org.koin.android.ext.android.inject
+import java.io.ByteArrayOutputStream
 
 class ChatFragment : Fragment() {
 
@@ -31,8 +42,8 @@ class ChatFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var messageAdapter: MessageAdapter
     private val messages = mutableListOf<Message>()
-    private lateinit var database: DatabaseReference
     private var userId: String? = null
+    private val PICK_MEDIA_REQUEST = 101
     private val auth: FirebaseAuth by inject()
     private val chatViewModel: ChatViewModel by inject()
 
@@ -40,11 +51,13 @@ class ChatFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ) : View? {
+    ): View? {
         setHasOptionsMenu(true)
         _binding = FragmentChatBinding.inflate(inflater, container, false)
-        activity?.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
-                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        activity?.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
         return binding.root
     }
 
@@ -61,12 +74,96 @@ class ChatFragment : Fragment() {
         setupSendButton(chatId)
         observeMessages(chatId)
         getUserName(userId)
+        setupAttachMediaButton()
+
+        if (context?.let { ContextCompat.checkSelfPermission(it, Manifest.permission.READ_EXTERNAL_STORAGE) }
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 1)
+        }
+
+    }
+
+    private fun setupAttachMediaButton() {
+        binding.attachMediaButton.setOnClickListener {
+            val intent = Intent(Intent.ACTION_PICK)
+            intent.type = "image/*"
+            startActivityForResult(intent, PICK_MEDIA_REQUEST)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == PICK_MEDIA_REQUEST && resultCode == Activity.RESULT_OK) {
+            data?.data?.let { mediaUri ->
+                val shortenedFileName = getShortenedFileName(mediaUri)
+                Log.d("ChatFragment", "Shortened file name: $shortenedFileName")
+                uploadMediaToDatabase(mediaUri)
+            }
+        }
+    }
+
+    private fun getShortenedFileName(uri: Uri): String {
+        val fileName = uri.lastPathSegment
+        // Dosya adını 50 karakterle sınırlıyoruz
+        return fileName?.take(50) ?: "unknown.jpg"
+    }
+
+    private fun uploadMediaToDatabase(mediaUri: Uri) {
+        val base64Image = encodeImageToBase64(mediaUri)
+
+        if (base64Image != null) {
+            sendMessageWithMedia(base64Image)
+        } else {
+            Toast.makeText(context, "Media encoding failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun encodeImageToBase64(uri: Uri): String? {
+        return try {
+            val inputStream = requireContext().contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 30, byteArrayOutputStream)
+            val imageBytes = byteArrayOutputStream.toByteArray()
+
+            Base64.encodeToString(imageBytes, Base64.DEFAULT)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun sendMessageWithMedia(mediaBase64: String) {
+        val chatId = createChatId(auth.currentUser?.uid ?: "", userId ?: "")
+        val newMessage = Message(
+            messageId = "",
+            sender = auth.currentUser?.uid ?: "Unknown",
+            content = "",
+            mediaContent = mediaBase64,
+            timestamp = System.currentTimeMillis(),
+            messageType = "media"
+        )
+
+        userId?.let { receiverId ->
+            chatViewModel.sendMessage(chatId, newMessage, receiverId)
+        }
+    }
+
+    private fun setupRecyclerView(currentUserId: String) {
+        messageAdapter = MessageAdapter(messages, currentUserId)
+        binding.messageRecyclerView.layoutManager = LinearLayoutManager(context)
+        binding.messageRecyclerView.adapter = messageAdapter
+        messageAdapter.notifyDataSetChanged()
     }
 
     @SuppressLint("NotifyDataSetChanged")
     private fun observeMessages(chatId: String) {
-        chatViewModel.fetchMessages(chatId).observe(viewLifecycleOwner, Observer { messageList -> messages.clear()
-        messages.addAll(messageList)
+        chatViewModel.fetchMessages(chatId).observe(viewLifecycleOwner, Observer { messageList ->
+            messages.clear()
+            messages.addAll(messageList)
             messageAdapter.notifyDataSetChanged()
             binding.messageRecyclerView.scrollToPosition(messages.size - 1)
         })
@@ -74,30 +171,22 @@ class ChatFragment : Fragment() {
 
     private fun getUserName(userId: String?) {
         if (userId != null) {
-            database = FirebaseDatabase.getInstance().getReference("users").child(userId)
+            val database = FirebaseDatabase.getInstance().getReference("users").child(userId)
             database.addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val userName = snapshot.child("name").value as? String
-                    if (userName != null) {
-                        binding.userNameTextView.text = userName
-                    } else {
-                        binding.userNameTextView.text = "Unknown User"
-                    }
+                    binding.userNameTextView.text = userName ?: "Unknown User"
                 }
 
                 override fun onCancelled(error: DatabaseError) {
-                    Toast.makeText(context, "Username could not be retrieved: ${error.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Username could not be retrieved: ${error.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             })
         }
-    }
-
-    @SuppressLint("NotifyDataSetChanged")
-    private fun setupRecyclerView(currentUserId: String) {
-        messageAdapter = MessageAdapter(messages, currentUserId)
-        binding.messageRecyclerView.layoutManager = LinearLayoutManager(context)
-        binding.messageRecyclerView.adapter = messageAdapter
-        messageAdapter.notifyDataSetChanged()
     }
 
     private fun setupSendButton(chatId: String) {

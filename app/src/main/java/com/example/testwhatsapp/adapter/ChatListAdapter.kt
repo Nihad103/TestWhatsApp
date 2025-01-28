@@ -3,6 +3,7 @@ package com.example.testwhatsapp.adapter
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -13,6 +14,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import java.text.SimpleDateFormat
 
 class ChatListAdapter(private var chatList: List<ChatList>) : RecyclerView.Adapter<ChatListAdapter.ChatListViewHolder>() {
 
@@ -42,11 +44,20 @@ class ChatListAdapter(private var chatList: List<ChatList>) : RecyclerView.Adapt
 
         holder.binding.textViewLastMessage.text = chat.lastMessage
         holder.binding.receiverNameTextView.text = chat.receiverName
-        holder.binding.timeTextView.text = java.text.SimpleDateFormat("HH:mm").format(chat.lastMessageTimestamp)
+        holder.binding.timeTextView.text = SimpleDateFormat("HH:mm").format(chat.lastMessageTimestamp)
 
+        if (chat.receiverName == "Unknown User") {
+            Toast.makeText(
+                holder.itemView.context,
+                "This user no longer exists.",
+                Toast.LENGTH_SHORT
+            ).show()
+        } else {
             holder.itemView.setOnClickListener {
-                val user = User(chat.chatId, chat.receiverName, "")
-                onItemClickListener?.let { it(user) }
+                findUserByName(chat.receiverName) { user ->
+                    onItemClickListener?.let { it(user) }
+                }
+            }
         }
     }
 
