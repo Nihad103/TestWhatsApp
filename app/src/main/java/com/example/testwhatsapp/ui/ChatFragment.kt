@@ -26,8 +26,10 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.testwhatsapp.R
 import com.example.testwhatsapp.adapter.MessageAdapter
 import com.example.testwhatsapp.databinding.FragmentChatBinding
+import com.example.testwhatsapp.model.Call
 import com.example.testwhatsapp.model.Message
 import com.example.testwhatsapp.viewmodel.ChatViewModel
+import com.example.testwhatsapp.webrtc.VoiceCallActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -44,6 +46,7 @@ class ChatFragment : Fragment() {
     private val messages = mutableListOf<Message>()
     private var userId: String? = null
     private val PICK_MEDIA_REQUEST = 101
+    private val REQUEST_CODE = 100
     private val auth: FirebaseAuth by inject()
     private val chatViewModel: ChatViewModel by inject()
 
@@ -81,7 +84,105 @@ class ChatFragment : Fragment() {
             ActivityCompat.requestPermissions(requireActivity(),
                 arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 1)
         }
+        binding.voiceCallButton.setOnClickListener {
+            startVoiceCall()
+        }
+    }
 
+    private fun startVoiceCall() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_CODE)
+        } else {
+            initiateCall()
+        }
+        Toast.makeText(context, "Səsli zəng başlayır...", Toast.LENGTH_SHORT).show()
+
+        val receiverId = userId ?: return
+        val callerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        val callId = "$callerId-$receiverId"
+        val channelName = "testChannel"
+        val token = "007eJxTYPAwFTr0xaEkbKtTjF1r4VnON/fnub8rq9EoXt5xiv95UJ0Cg7mpRapZiqGhmYGlmYmhqXmicZKFuWlKUnKiuZllkonlGYv56Q2BjAyCfS8ZGRkgEMTnZihJLS5xzkjMy0vNYWAAAA5kIdo="
+
+        // Firebase referansı
+        val callRef = FirebaseDatabase.getInstance().getReference("calls").child(callId)
+
+        // Call modelini yaradırıq
+        val call = Call(
+            callId = callId,
+            callerId = callerId,
+            receiverId = receiverId,
+            status = "ringing",
+            timestamp = System.currentTimeMillis(),
+            channelName = channelName,
+            token = token
+        )
+
+        // Firebase-ə yazırıq
+        callRef.setValue(call).addOnSuccessListener {
+            Toast.makeText(context, "Calling...", Toast.LENGTH_SHORT).show()
+            val intent = Intent(context, VoiceCallActivity::class.java).apply {
+                putExtra("callId", callId)
+                putExtra("callerId", callerId)
+                putExtra("receiverId", receiverId)
+                putExtra("channelName", channelName)
+                putExtra("token", token)
+            }
+            startActivity(intent)
+        }.addOnFailureListener { e ->
+            Toast.makeText(context, "Call failed: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun initiateCall() {
+        Toast.makeText(context, "Səsli zəng başlayır...", Toast.LENGTH_SHORT).show()
+
+        val receiverId = userId ?: return
+        val callerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        val callId = "$callerId-$receiverId"
+        val channelName = "testChannel"
+        val token = "007eJxTYPAwFTr0xaEkbKtTjF1r4VnON/fnub8rq9EoXt5xiv95UJ0Cg7mpRapZiqGhmYGlmYmhqXmicZKFuWlKUnKiuZllkonlGYv56Q2BjAyCfS8ZGRkgEMTnZihJLS5xzkjMy0vNYWAAAA5kIdo="
+
+        // Firebase referansı
+        val callRef = FirebaseDatabase.getInstance().getReference("calls").child(callId)
+
+        // Call modelini yaradırıq
+        val call = Call(
+            callId = callId,
+            callerId = callerId,
+            receiverId = receiverId,
+            status = "ringing",
+            timestamp = System.currentTimeMillis(),
+            channelName = channelName,
+            token = token
+        )
+
+        // Firebase-ə yazırıq
+        callRef.setValue(call).addOnSuccessListener {
+            Toast.makeText(context, "Calling...", Toast.LENGTH_SHORT).show()
+            val intent = Intent(context, VoiceCallActivity::class.java).apply {
+                putExtra("callId", callId)
+                putExtra("callerId", callerId)
+                putExtra("receiverId", receiverId)
+                putExtra("channelName", channelName)
+                putExtra("token", token)
+            }
+            startActivity(intent)
+        }.addOnFailureListener { e ->
+            Toast.makeText(context, "Call failed: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                initiateCall()  // Mikrofon icazəsi verildikdən sonra zəngi başlat
+            } else {
+                Toast.makeText(context, "Mikrofon icazəsi lazımdır", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupAttachMediaButton() {
@@ -106,7 +207,6 @@ class ChatFragment : Fragment() {
 
     private fun getShortenedFileName(uri: Uri): String {
         val fileName = uri.lastPathSegment
-        // Dosya adını 50 karakterle sınırlıyoruz
         return fileName?.take(50) ?: "unknown.jpg"
     }
 

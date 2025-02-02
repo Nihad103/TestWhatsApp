@@ -138,8 +138,9 @@ class ChatListFragment : Fragment() {
     private fun loadAllUsers() {
         val userRepository = UserRepository()
         userRepository.loadAllUsers({ users ->
+            val currentUserId = auth.currentUser?.uid
             allUsers.clear()
-            allUsers.addAll(users)
+            allUsers.addAll(users.filter { it.id != currentUserId })
             userAdapter.updateList(allUsers)
         }, { error ->
             Log.e("ChatListFragment", "Error loading users: ${error.message}")

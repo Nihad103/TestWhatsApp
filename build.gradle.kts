@@ -6,7 +6,7 @@ buildscript {
     }
     dependencies {
         classpath ("androidx.navigation:navigation-safe-args-gradle-plugin:2.8.5")
-        classpath ("com.android.tools.build:gradle:8.1.4")
+        classpath ("com.android.tools.build:gradle:8.2.2")
         classpath(libs.google.services)
     }
 }
@@ -16,3 +16,9 @@ plugins {
     id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}

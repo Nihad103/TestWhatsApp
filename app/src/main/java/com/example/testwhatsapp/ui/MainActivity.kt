@@ -1,6 +1,7 @@
 package com.example.testwhatsapp.ui
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Log
@@ -19,6 +20,7 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.example.testwhatsapp.R
 import com.example.testwhatsapp.model.Chat
+import com.example.testwhatsapp.webrtc.VoiceCallActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -57,8 +59,82 @@ class MainActivity : AppCompatActivity() {
             supportActionBar?.title = getString(R.string.app_name)
             invalidateOptionsMenu()
         }
-
+        listenForIncomingCalls()
     }
+
+    private fun listenForIncomingCalls() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val database = FirebaseDatabase.getInstance().getReference("calls")
+
+        database.orderByChild("receiverId").equalTo(userId)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    for (callSnapshot in snapshot.children) {
+                        val call = callSnapshot.getValue(com.example.testwhatsapp.model.Call::class.java)
+                        if (call != null) {
+                            when (call.status) {
+                                "ringing" -> {
+                                    // Zəng gəldikdə
+                                    handleIncomingCall(call)
+                                }
+                                "answered" -> {
+                                    // Zəng cavablandıqda
+                                    Log.d("IncomingCall", "Call answered: ${call.callId}")
+                                }
+                                "ended" -> {
+                                    // Zəng bitdikdə
+                                    Log.d("IncomingCall", "Call ended: ${call.callId}")
+                                }
+                                "rejected" -> {
+                                    // Zəng rədd edildikdə
+                                    Log.d("IncomingCall", "Call rejected: ${call.callId}")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("IncomingCall", "Database error: ${error.message}")
+                }
+            })
+    }
+
+    private fun handleIncomingCall(call: com.example.testwhatsapp.model.Call) {
+        runOnUiThread {
+            AlertDialog.Builder(this)
+                .setTitle("Incoming Call")
+                .setMessage("You have an incoming call from ${call.callerId}. Accept?")
+                .setPositiveButton("Accept") { _, _ ->
+                    // Firebase-də statusu "answered" olaraq yeniləyirik və VoiceCallActivity-i başladırıq
+                    FirebaseDatabase.getInstance().getReference("calls")
+                        .child(call.callId)
+                        .child("status")
+                        .setValue("answered")
+                        .addOnSuccessListener {
+                            val intent = Intent(this, VoiceCallActivity::class.java).apply {
+                                putExtra("callId", call.callId)
+                                putExtra("callerId", call.callerId)
+                                putExtra("receiverId", call.receiverId)
+                                putExtra("channelName", call.channelName)
+                                putExtra("token", call.token)
+                            }
+                            startActivity(intent)
+                        }
+                }
+                .setNegativeButton("Reject") { dialog, _ ->
+                    // Firebase-də statusu "rejected" olaraq yeniləyirik
+                    FirebaseDatabase.getInstance().getReference("calls")
+                        .child(call.callId)
+                        .child("status")
+                        .setValue("rejected")
+                    dialog.dismiss()
+                }
+                .setCancelable(false)
+                .show()
+        }
+    }
+
 
     override fun onSupportNavigateUp(): Boolean {
         return navController.navigateUp() || super.onSupportNavigateUp()

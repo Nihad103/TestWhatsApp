@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
-    id("com.google.gms.google-services")
+    id ("com.google.gms.google-services")
     id ("androidx.navigation.safeargs.kotlin")
 }
 
@@ -86,5 +86,11 @@ dependencies {
     //Glide
     implementation ("com.github.bumptech.glide:glide:4.13.2")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
+
+    //WebRTC
+    implementation ("io.getstream:stream-webrtc-android:1.3.7")
+
+    // Agora
+    implementation ("io.agora.rtc:full-sdk:3.5.0")
 }
 apply(plugin = "com.google.gms.google-services")
