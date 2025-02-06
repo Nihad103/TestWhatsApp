@@ -6,8 +6,19 @@
     android:orientation="vertical"
     android:gravity="center"
     android:padding="20dp"
-    android:background="@android:color/black"
+    android:background="@drawable/voiceactivity_background"
     tools:context=".webrtc.VoiceCallActivity">
+
+    <TextView
+        android:id="@+id/tvIncomingCallInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Call info"
+        android:textSize="18sp"
+        android:layout_marginBottom="20dp"
+        android:layout_marginTop="20dp"
+        android:textColor="@color/white"
+        android:layout_centerHorizontal="true" />
 
     <TextView
         android:id="@+id/tvCallerName"
@@ -19,17 +30,11 @@
         android:paddingBottom="20dp"/>
 
     <Button
-        android:id="@+id/btnAcceptCall"
+        android:id="@+id/btnEndCall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Accept"
-        android:backgroundTint="@android:color/holo_green_light"/>
-
-    <Button
-        android:id="@+id/btnDeclineCall"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Decline"
+        android:text="End Call"
         android:backgroundTint="@android:color/holo_red_light"
         android:layout_marginTop="10dp"/>
+
 </LinearLayout>

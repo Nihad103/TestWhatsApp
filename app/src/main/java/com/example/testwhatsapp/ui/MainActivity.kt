@@ -20,6 +20,7 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.example.testwhatsapp.R
 import com.example.testwhatsapp.model.Chat
+import com.example.testwhatsapp.model.User
 import com.example.testwhatsapp.webrtc.VoiceCallActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -74,19 +75,15 @@ class MainActivity : AppCompatActivity() {
                         if (call != null) {
                             when (call.status) {
                                 "ringing" -> {
-                                    // Zəng gəldikdə
                                     handleIncomingCall(call)
                                 }
                                 "answered" -> {
-                                    // Zəng cavablandıqda
                                     Log.d("IncomingCall", "Call answered: ${call.callId}")
                                 }
                                 "ended" -> {
-                                    // Zəng bitdikdə
                                     Log.d("IncomingCall", "Call ended: ${call.callId}")
                                 }
                                 "rejected" -> {
-                                    // Zəng rədd edildikdə
                                     Log.d("IncomingCall", "Call rejected: ${call.callId}")
                                 }
                             }
@@ -102,28 +99,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleIncomingCall(call: com.example.testwhatsapp.model.Call) {
         runOnUiThread {
+            val user = User()
             AlertDialog.Builder(this)
                 .setTitle("Incoming Call")
-                .setMessage("You have an incoming call from ${call.callerId}. Accept?")
+                .setMessage("You have an incoming call from ${user.name}. Accept?")
                 .setPositiveButton("Accept") { _, _ ->
-                    // Firebase-də statusu "answered" olaraq yeniləyirik və VoiceCallActivity-i başladırıq
-                    FirebaseDatabase.getInstance().getReference("calls")
-                        .child(call.callId)
-                        .child("status")
-                        .setValue("answered")
-                        .addOnSuccessListener {
-                            val intent = Intent(this, VoiceCallActivity::class.java).apply {
-                                putExtra("callId", call.callId)
-                                putExtra("callerId", call.callerId)
-                                putExtra("receiverId", call.receiverId)
-                                putExtra("channelName", call.channelName)
-                                putExtra("token", call.token)
-                            }
-                            startActivity(intent)
-                        }
+                    acceptCall(call)
                 }
                 .setNegativeButton("Reject") { dialog, _ ->
-                    // Firebase-də statusu "rejected" olaraq yeniləyirik
+                    FirebaseDatabase.getInstance().getReference("calls").child(call.callId).removeValue()
                     FirebaseDatabase.getInstance().getReference("calls")
                         .child(call.callId)
                         .child("status")
@@ -135,6 +119,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun acceptCall(call: com.example.testwhatsapp.model.Call) {
+        val database = FirebaseDatabase.getInstance().getReference("calls")
+
+        database.child(call.callId).child("status").setValue("answered")
+            .addOnSuccessListener {
+                val intent = Intent(this, VoiceCallActivity::class.java).apply {
+                    putExtra("callId", call.callId)
+                    putExtra("callerId", call.callerId)
+                    putExtra("receiverId", call.receiverId)
+                    putExtra("channelName", call.channelName)
+                    putExtra("token", call.token)
+                }
+                startActivity(intent)
+            }
+    }
 
     override fun onSupportNavigateUp(): Boolean {
         return navController.navigateUp() || super.onSupportNavigateUp()
@@ -215,7 +214,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
 
     private fun logout() {
         FirebaseAuth.getInstance().signOut()

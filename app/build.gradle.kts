@@ -15,13 +15,27 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        multiDexEnabled = false
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = true
+        }
+    }
+    packagingOptions {
+        exclude ("lib/arm64-v8a/libagora-rtc-sdk-video.so")
+        exclude ("lib/arm64-v8a/libjingle_peerconnection_so.so")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -59,10 +73,8 @@ dependencies {
     //FireBase
     implementation (platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation ("com.google.firebase:firebase-analytics")
-    implementation ("com.google.firebase:firebase-storage:21.0.1")
     implementation ("com.google.firebase:firebase-database")
     implementation ("com.google.firebase:firebase-auth-ktx:23.1.0")
-    implementation ("com.google.firebase:firebase-database:21.0.0")
 
     //ViewModel
     implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
@@ -87,10 +99,7 @@ dependencies {
     implementation ("com.github.bumptech.glide:glide:4.13.2")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.15.1")
 
-    //WebRTC
-    implementation ("io.getstream:stream-webrtc-android:1.3.7")
-
     // Agora
-    implementation ("io.agora.rtc:full-sdk:3.5.0")
+    implementation ("io.agora.rtc:voice-sdk:4.2.3")
 }
 apply(plugin = "com.google.gms.google-services")

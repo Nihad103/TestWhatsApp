@@ -79,10 +79,17 @@ class ChatFragment : Fragment() {
         getUserName(userId)
         setupAttachMediaButton()
 
-        if (context?.let { ContextCompat.checkSelfPermission(it, Manifest.permission.READ_EXTERNAL_STORAGE) }
+        if (context?.let {
+                ContextCompat.checkSelfPermission(
+                    it,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                )
+            }
             != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(requireActivity(),
-                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 1)
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 1
+            )
         }
         binding.voiceCallButton.setOnClickListener {
             startVoiceCall()
@@ -90,95 +97,64 @@ class ChatFragment : Fragment() {
     }
 
     private fun startVoiceCall() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(requireActivity(), arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_CODE)
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                REQUEST_CODE
+            )
         } else {
-            initiateCall()
-        }
-        Toast.makeText(context, "Səsli zəng başlayır...", Toast.LENGTH_SHORT).show()
 
-        val receiverId = userId ?: return
-        val callerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            val receiverId = userId ?: return
+            val callerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
-        val callId = "$callerId-$receiverId"
-        val channelName = "testChannel"
-        val token = "007eJxTYPAwFTr0xaEkbKtTjF1r4VnON/fnub8rq9EoXt5xiv95UJ0Cg7mpRapZiqGhmYGlmYmhqXmicZKFuWlKUnKiuZllkonlGYv56Q2BjAyCfS8ZGRkgEMTnZihJLS5xzkjMy0vNYWAAAA5kIdo="
+            val callId = "$callerId-$receiverId"
+            val channelName = "channel3"
+            val token =
+                "007eJxTYPDLbPp6XX5zSIHcBVn3Srfjwoq/j5S1HT7Q579v5v2a+Y8VGMxNLVLNUgwNzQwszUwMTc0TjZMszE1TkpITzc0sk0wsF89bkt4QyMhwf1kPCyMDBIL4HAzJGYl5eak5xgwMAC0uIpg="
 
-        // Firebase referansı
-        val callRef = FirebaseDatabase.getInstance().getReference("calls").child(callId)
+            val callRef = FirebaseDatabase.getInstance().getReference("calls").child(callId)
 
-        // Call modelini yaradırıq
-        val call = Call(
-            callId = callId,
-            callerId = callerId,
-            receiverId = receiverId,
-            status = "ringing",
-            timestamp = System.currentTimeMillis(),
-            channelName = channelName,
-            token = token
-        )
+            val call = Call(
+                callId = callId,
+                callerId = callerId,
+                receiverId = receiverId,
+                status = "ringing",
+                timestamp = System.currentTimeMillis(),
+                channelName = channelName,
+                token = token
+            )
 
-        // Firebase-ə yazırıq
-        callRef.setValue(call).addOnSuccessListener {
-            Toast.makeText(context, "Calling...", Toast.LENGTH_SHORT).show()
-            val intent = Intent(context, VoiceCallActivity::class.java).apply {
-                putExtra("callId", callId)
-                putExtra("callerId", callerId)
-                putExtra("receiverId", receiverId)
-                putExtra("channelName", channelName)
-                putExtra("token", token)
+            callRef.setValue(call).addOnSuccessListener {
+                Toast.makeText(context, "Calling...", Toast.LENGTH_SHORT).show()
+                val intent = Intent(context, VoiceCallActivity::class.java).apply {
+                    putExtra("callId", callId)
+                    putExtra("callerId", callerId)
+                    putExtra("receiverId", receiverId)
+                    putExtra("channelName", channelName)
+                    putExtra("isCaller", true)
+                    putExtra("token", token)
+                }
+                startActivity(intent)
+            }.addOnFailureListener { e ->
+                Toast.makeText(context, "Call failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
-            startActivity(intent)
-        }.addOnFailureListener { e ->
-            Toast.makeText(context, "Call failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun initiateCall() {
-        Toast.makeText(context, "Səsli zəng başlayır...", Toast.LENGTH_SHORT).show()
-
-        val receiverId = userId ?: return
-        val callerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-
-        val callId = "$callerId-$receiverId"
-        val channelName = "testChannel"
-        val token = "007eJxTYPAwFTr0xaEkbKtTjF1r4VnON/fnub8rq9EoXt5xiv95UJ0Cg7mpRapZiqGhmYGlmYmhqXmicZKFuWlKUnKiuZllkonlGYv56Q2BjAyCfS8ZGRkgEMTnZihJLS5xzkjMy0vNYWAAAA5kIdo="
-
-        // Firebase referansı
-        val callRef = FirebaseDatabase.getInstance().getReference("calls").child(callId)
-
-        // Call modelini yaradırıq
-        val call = Call(
-            callId = callId,
-            callerId = callerId,
-            receiverId = receiverId,
-            status = "ringing",
-            timestamp = System.currentTimeMillis(),
-            channelName = channelName,
-            token = token
-        )
-
-        // Firebase-ə yazırıq
-        callRef.setValue(call).addOnSuccessListener {
-            Toast.makeText(context, "Calling...", Toast.LENGTH_SHORT).show()
-            val intent = Intent(context, VoiceCallActivity::class.java).apply {
-                putExtra("callId", callId)
-                putExtra("callerId", callerId)
-                putExtra("receiverId", receiverId)
-                putExtra("channelName", channelName)
-                putExtra("token", token)
-            }
-            startActivity(intent)
-        }.addOnFailureListener { e ->
-            Toast.makeText(context, "Call failed: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                initiateCall()  // Mikrofon icazəsi verildikdən sonra zəngi başlat
+                startVoiceCall()
             } else {
                 Toast.makeText(context, "Mikrofon icazəsi lazımdır", Toast.LENGTH_SHORT).show()
             }
@@ -261,12 +237,13 @@ class ChatFragment : Fragment() {
 
     @SuppressLint("NotifyDataSetChanged")
     private fun observeMessages(chatId: String) {
-        chatViewModel.fetchMessages(chatId).observe(viewLifecycleOwner, Observer { messageList ->
-            messages.clear()
-            messages.addAll(messageList)
-            messageAdapter.notifyDataSetChanged()
-            binding.messageRecyclerView.scrollToPosition(messages.size - 1)
-        })
+        chatViewModel.fetchMessages(chatId)
+            .observe(viewLifecycleOwner, Observer { messageList ->
+                messages.clear()
+                messages.addAll(messageList)
+                messageAdapter.notifyDataSetChanged()
+                binding.messageRecyclerView.scrollToPosition(messages.size - 1)
+            })
     }
 
     private fun getUserName(userId: String?) {
